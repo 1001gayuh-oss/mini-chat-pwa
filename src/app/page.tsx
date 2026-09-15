@@ -1,69 +1,80 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+import React, { useState, useEffect } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, LocalMessage } from '@/lib/db';
+import { syncOutboxMessages } from '@/lib/syncEngine';
+import { Wifi, WifiOff, Send, Clock, CheckCheck } from 'lucide-react';
+
+// DUMMY USER & CONVERSATION UNTUK MVP PROTOTYPE
+const CURRENT_USER_ID = '11111111-1111-1111-1111-111111111111';
+const CONVERSATION_ID = '22222222-2222-2222-2222-222222222222';
+
+export default function ChatApp() {
+  const [inputText, setInputText] = useState('');
+  const [isOnline, setIsOnline] = useState(true);
+
+  // Ambil data pesan langsung dari IndexedDB (Lokal)
+  const messages = useLiveQuery(
+    () => db.messages.where({ conversation_id: CONVERSATION_ID }).sortBy('created_at'),
+    []
   );
-}
+
+  // Deteksi Perubahan Status Jaringan
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+
+    const handleOnline = () => {
+      setIsOnline(true);
+      syncOutboxMessages(); // Langsung kirim pesan tertunda saat online
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Fungsi Kirim Pesan
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputText.trim()) return;
+
+    const newMessageId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    const newMessage: LocalMessage = {
+      id: newMessageId,
+      conversation_id: CONVERSATION_ID,
+      sender_id: CURRENT_USER_ID,
+      content: inputText,
+      created_at: now,
+      sync_status: isOnline ? 'synced' : 'pending',
+    };
+
+    // 1. Selalu tulis ke DB Lokal terlebih dahulu
+    await db.messages.add(newMessage);
+
+    if (!isOnline) {
+      // Jika offline, masuk ke antrean Outbox
+      await db.outbox.add({
+        id: newMessageId,
+        conversation_id: CONVERSATION_ID,
+        sender_id: CURRENT_USER_ID,
+        content: inputText,
+        created_at: now,
+        retry_count: 0,
+      });
+    } else {
+      // Jika online, coba kirim ke cloud
+      syncOutboxMessages();
+    }
+
+    setInputText('');
+  };
+
+  return (
