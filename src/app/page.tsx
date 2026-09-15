@@ -6,7 +6,6 @@ import { db, LocalMessage } from '@/lib/db';
 import { syncOutboxMessages } from '@/lib/syncEngine';
 import { Wifi, WifiOff, Send, Clock, CheckCheck } from 'lucide-react';
 
-// DUMMY USER & CONVERSATION UNTUK MVP PROTOTYPE
 const CURRENT_USER_ID = '11111111-1111-1111-1111-111111111111';
 const CONVERSATION_ID = '22222222-2222-2222-2222-222222222222';
 
@@ -14,7 +13,7 @@ export default function ChatApp() {
   const [inputText, setInputText] = useState('');
   const [isOnline, setIsOnline] = useState(true);
 
-  // Ambil data pesan langsung dari IndexedDB (Lokal)
+  // Ambil data pesan dari IndexedDB
   const messages = useLiveQuery(
     () => db.messages.where({ conversation_id: CONVERSATION_ID }).sortBy('created_at'),
     []
@@ -26,7 +25,7 @@ export default function ChatApp() {
 
     const handleOnline = () => {
       setIsOnline(true);
-      syncOutboxMessages(); // Langsung kirim pesan tertunda saat online
+      syncOutboxMessages();
     };
     const handleOffline = () => setIsOnline(false);
 
@@ -56,11 +55,9 @@ export default function ChatApp() {
       sync_status: isOnline ? 'synced' : 'pending',
     };
 
-    // 1. Selalu tulis ke DB Lokal terlebih dahulu
     await db.messages.add(newMessage);
 
     if (!isOnline) {
-      // Jika offline, masuk ke antrean Outbox
       await db.outbox.add({
         id: newMessageId,
         conversation_id: CONVERSATION_ID,
@@ -70,7 +67,6 @@ export default function ChatApp() {
         retry_count: 0,
       });
     } else {
-      // Jika online, coba kirim ke cloud
       syncOutboxMessages();
     }
 
