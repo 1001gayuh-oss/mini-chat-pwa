@@ -12,8 +12,7 @@ import {
   Settings, 
   User, 
   Plus, 
-  ChevronRight,
-  Sparkles
+  ChevronRight 
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -42,7 +41,6 @@ export default function HomePage() {
 
   // 2. Ambil Daftar Histori Chat Pengguna dari Supabase
   const fetchConversations = async (userId: string) => {
-    // Mengambil percakapan di mana user saat ini menjadi anggotanya
     const { data, error } = await supabase
       .from('conversation_members')
       .select(`
@@ -55,7 +53,6 @@ export default function HomePage() {
       .eq('user_id', userId);
 
     if (!error && data) {
-      // Format data agar mudah ditampilkan di UI beranda
       const formattedRooms = data.map((item: any) => ({
         id: item.conversations.id,
         name: `Ruang Obrolan (${item.conversations.id.substring(0, 6)})`,
@@ -80,7 +77,6 @@ export default function HomePage() {
     );
   }
 
-  // Filter pencarian histori chat
   const filteredConversations = conversations.filter((chat) =>
     chat.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -103,7 +99,7 @@ export default function HomePage() {
 
           {/* Dropdown Menu Titik Tiga */}
           {showMenu && (
-            <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 py-1.5 z-50 animate-fadeIn">
+            <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 py-1.5 z-50">
               <button
                 onClick={() => { setShowMenu(false); alert('Fitur Profil Segera Hadir'); }}
                 className="w-full px-4 py-2.5 text-left text-xs flex items-center gap-2.5 text-gray-700 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-slate-700/50"
@@ -143,7 +139,7 @@ export default function HomePage() {
       </header>
 
       {/* --- KOTAK PENCARIAN DI ATAS --- */}
-      <div className="p-3 bg-white dark:bg-slate-800 border-b dark:border-slate-700 shadow-xs">
+      <div className="p-3 bg-white dark:bg-slate-800 border-b dark:border-slate-700">
         <div className="relative flex items-center">
           <Search className="w-4 h-4 absolute left-3.5 text-slate-400" />
           <input
@@ -193,8 +189,7 @@ export default function HomePage() {
       <div className="absolute bottom-6 right-6">
         <button
           onClick={() => {
-            // Contoh membuat ruang obrolan baru secara instan
-            const newRoomId = 'room-' + Math.random().toString(36.substring(2, 9));
+            const newRoomId = 'room-' + Math.random().toString(36).substring(2, 9);
             router.push(`/chat?room=${newRoomId}`);
           }}
           className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-2xl active:scale-95 transition"
