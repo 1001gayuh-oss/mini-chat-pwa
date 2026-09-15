@@ -12,7 +12,9 @@ import {
   Settings, 
   User, 
   Plus, 
-  ChevronRight 
+  ChevronRight,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -20,6 +22,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showMenu, setShowMenu] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
   const [conversations, setConversations] = useState<any[]>([]);
   const router = useRouter();
 
@@ -38,6 +41,21 @@ export default function HomePage() {
 
     checkUser();
   }, [router]);
+
+  // Deteksi Jaringan Online / Offline
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // 2. Ambil Daftar Histori Chat Pengguna dari Supabase
   const fetchConversations = async (userId: string) => {
@@ -87,53 +105,63 @@ export default function HomePage() {
       {/* --- HEADER BERANDA --- */}
       <header className="p-4 bg-white dark:bg-slate-800 border-b dark:border-slate-700 flex justify-between items-center shadow-sm relative">
         
-        {/* Pojok Kiri: Ikon Titik Tiga (Menu Pengaturan) */}
-        <div className="relative">
-          <button
-            onClick={() => setShowMenu(!showMenu)}
-            className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition"
-            title="Menu Pengaturan"
-          >
-            <MoreVertical className="w-5 h-5" />
-          </button>
-
-          {/* Dropdown Menu Titik Tiga */}
-          {showMenu && (
-            <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 py-1.5 z-50">
-              <button
-                onClick={() => { setShowMenu(false); alert('Fitur Profil Segera Hadir'); }}
-                className="w-full px-4 py-2.5 text-left text-xs flex items-center gap-2.5 text-gray-700 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-slate-700/50"
-              >
-                <User className="w-4 h-4 text-blue-500" />
-                <span>Profil Saya</span>
-              </button>
-              <button
-                onClick={() => { setShowMenu(false); alert('Fitur Pengaturan Segera Hadir'); }}
-                className="w-full px-4 py-2.5 text-left text-xs flex items-center gap-2.5 text-gray-700 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-slate-700/50"
-              >
-                <Settings className="w-4 h-4 text-slate-500" />
-                <span>Pengaturan Aplikasi</span>
-              </button>
-              <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
-              <button
-                onClick={handleLogout}
-                className="w-full px-4 py-2.5 text-left text-xs flex items-center gap-2.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Keluar Akun</span>
-              </button>
-            </div>
-          )}
+        {/* Kiri: Avatar / Info Akun Singkat */}
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-blue-50 dark:bg-slate-700 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs shadow-inner">
+            {user?.email?.substring(0, 2).toUpperCase()}
+          </div>
+          <div className="flex flex-col">
+            <h1 className="font-bold text-gray-800 dark:text-white text-sm leading-tight">CiChat</h1>
+            <p className="text-[10px] text-slate-400 truncate max-w-[120px]">{user?.email}</p>
+          </div>
         </div>
 
-        {/* Judul Tengah */}
-        <div className="text-center">
-          <h1 className="font-bold text-gray-800 dark:text-white text-base">CiChat</h1>
-        </div>
+        {/* Kanan: Indikator Jaringan + Ikon Titik Tiga (Menu Pengaturan) */}
+        <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${
+            isOnline ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400'
+          }`}>
+            {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+            <span>{isOnline ? 'Online' : 'Offline'}</span>
+          </div>
 
-        {/* Kanan: Indikator Akun Singkat */}
-        <div className="w-8 h-8 bg-blue-50 dark:bg-slate-700 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs shadow-inner">
-          {user?.email?.substring(0, 2).toUpperCase()}
+          <div className="relative">
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition"
+              title="Menu Pengaturan"
+            >
+              <MoreVertical className="w-5 h-5" />
+            </button>
+
+            {/* Dropdown Menu Titik Tiga di Pojok Kanan Atas */}
+            {showMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border dark:border-slate-700 py-1.5 z-50">
+                <button
+                  onClick={() => { setShowMenu(false); alert('Fitur Profil Segera Hadir'); }}
+                  className="w-full px-4 py-2.5 text-left text-xs flex items-center gap-2.5 text-gray-700 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                >
+                  <User className="w-4 h-4 text-blue-500" />
+                  <span>Profil Saya</span>
+                </button>
+                <button
+                  onClick={() => { setShowMenu(false); alert('Fitur Pengaturan Segera Hadir'); }}
+                  className="w-full px-4 py-2.5 text-left text-xs flex items-center gap-2.5 text-gray-700 dark:text-gray-200 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                >
+                  <Settings className="w-4 h-4 text-slate-500" />
+                  <span>Pengaturan Aplikasi</span>
+                </button>
+                <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
+                <button
+                  onClick={handleLogout}
+                  className="w-full px-4 py-2.5 text-left text-xs flex items-center gap-2.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Keluar Akun</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
