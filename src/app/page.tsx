@@ -123,12 +123,12 @@ export default function ChatApp() {
                         minute: '2-digit',
                       })}
                     </span>
-                    {/* Indikator Status Pesan Lokal vs Cloud */}
+                    {/* Indikator Status Pesan Lokal vs Cloud (Atribut title dihapus agar lolos TypeScript) */}
                     {isMe &&
                       (msg.sync_status === 'pending' ? (
-                        <Clock className="w-3 h-3 animate-pulse text-amber-200" title="Menunggu sinkronisasi..." />
+                        <Clock className="w-3 h-3 animate-pulse text-amber-200" />
                       ) : (
-                        <CheckCheck className="w-3 h-3 text-emerald-300" title="Terkirim" />
+                        <CheckCheck className="w-3 h-3 text-emerald-300" />
                       ))}
                   </div>
                 </div>
