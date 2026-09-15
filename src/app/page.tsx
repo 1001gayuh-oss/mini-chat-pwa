@@ -73,4 +73,33 @@ export default function ChatApp() {
     setInputText('');
   };
 
-  return (
+  return ():
+
+Mini App Chat MVP
+{isOnline ?  : }
+{isOnline ? 'Online' : 'Offline Mode'}
+
+{messages?.map((msg) => {
+const isMe = msg.sender_id === CURRENT_USER_ID;
+return (
+
+{msg.content}
+
+{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+{isMe && (
+msg.sync_status === 'pending'
+?
+
+:
+)}
+
+);
+})}
+
+setInputText(e.target.value)}
+placeholder={isOnline ? "Tulis pesan..." : "Tulis pesan (Offline)..."}
+className="flex-1 px-4 py-2 text-sm border rounded-full focus:outline-none focus:border-blue-500 text-gray-800"
+/>
+
+);
+}
