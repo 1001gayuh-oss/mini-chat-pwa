@@ -128,8 +128,7 @@ export default function HomePage() {
 
         {/* Judul Tengah */}
         <div className="text-center">
-          <h1 className="font-bold text-gray-800 dark:text-white text-base">Mini Chat</h1>
-          <p className="text-[10px] text-slate-400">WhatsApp-Grade</p>
+          <h1 className="font-bold text-gray-800 dark:text-white text-base">CiChat</h1>
         </div>
 
         {/* Kanan: Indikator Akun Singkat */}
