@@ -9,7 +9,7 @@ import { Wifi, WifiOff, Send, Clock, CheckCheck } from 'lucide-react';
 const CURRENT_USER_ID = '11111111-1111-1111-1111-111111111111';
 const CONVERSATION_ID = '22222222-2222-2222-2222-222222222222';
 
-export default function Page(): JSX.Element {
+export default function ChatApp() {
   const [inputText, setInputText] = useState('');
   const [isOnline, setIsOnline] = useState(true);
 
