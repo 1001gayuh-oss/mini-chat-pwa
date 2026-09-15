@@ -5,20 +5,45 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, LocalMessage } from '@/lib/db';
 import { syncOutboxMessages } from '@/lib/syncEngine';
 import { supabase } from '@/lib/supabase';
-import { Wifi, WifiOff, Send, Clock, CheckCheck, Users, MessageSquareCode } from 'lucide-react';
-
-const MOCK_USERS = [
-  { id: '11111111-1111-1111-1111-111111111111', name: 'User A', color: 'bg-blue-600', bubbleColor: 'bg-blue-600 text-white' },
-  { id: '22222222-2222-2222-2222-222222222222', name: 'User B', color: 'bg-emerald-600', bubbleColor: 'bg-emerald-600 text-white' },
-  { id: '33333333-3333-3333-3333-333333333333', name: 'User C', color: 'bg-purple-600', bubbleColor: 'bg-purple-600 text-white' },
-];
+import { useRouter } from 'next/navigation';
+import { Wifi, WifiOff, Send, Clock, CheckCheck, LogOut, MessageSquareCode } from 'lucide-react';
 
 const CONVERSATION_ID = 'room-chat-global-mvp';
 
 export default function ChatApp() {
-  const [currentUserId, setCurrentUserId] = useState(MOCK_USERS[0].id);
+  const [user, setUser] = useState<any>(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
   const [inputText, setInputText] = useState('');
   const [isOnline, setIsOnline] = useState(true);
+  const router = useRouter();
+
+  // 1. Cek Sesi Pengguna yang Sedang Login
+  useEffect(() => {
+    const checkUserSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        // Jika belum login, lempar ke halaman login
+        router.push('/login');
+      } else {
+        setUser(session.user);
+      }
+      setLoadingAuth(false);
+    };
+
+    checkUserSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        router.push('/login');
+      } else {
+        setUser(session?.user ?? null);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [router]);
 
   // Ambil pesan dari IndexedDB secara reaktif
   const messages = useLiveQuery(
@@ -26,12 +51,12 @@ export default function ChatApp() {
     []
   );
 
-  // Sinkronisasi & Realtime Listener Dua Arah yang Sinkron
+  // Realtime Sync Listener Dua Arah
   useEffect(() => {
+    if (!user) return;
     let channel: any;
 
     const initRealtimeSync = async () => {
-      // 1. Tarik data historis dari Cloud Supabase saat komponen dimuat
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -54,7 +79,6 @@ export default function ChatApp() {
         }
       }
 
-      // 2. Berlangganan WebSocket Realtime Supabase dengan Channel Publik yang Sinkron
       channel = supabase
         .channel('public:messages')
         .on(
@@ -91,7 +115,7 @@ export default function ChatApp() {
         supabase.removeChannel(channel);
       }
     };
-  }, []);
+  }, [user]);
 
   // Deteksi Jaringan Online / Offline
   useEffect(() => {
@@ -111,10 +135,16 @@ export default function ChatApp() {
     };
   }, []);
 
-  // Fungsi Kirim Pesan
+  // Fungsi Keluar (Logout)
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
+
+  // Fungsi Kirim Pesan Menggunakan ID Auth Asli
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || !user) return;
 
     const newMessageId = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -122,30 +152,28 @@ export default function ChatApp() {
     const newMessage: LocalMessage = {
       id: newMessageId,
       conversation_id: CONVERSATION_ID,
-      sender_id: currentUserId,
+      sender_id: user.id, // Menggunakan ID asli dari akun Supabase Auth
       content: inputText,
       created_at: now,
       sync_status: isOnline ? 'synced' : 'pending',
     };
 
-    // Simpan ke IndexedDB lokal terlebih dahulu (Prinsip Local-First)
     await db.messages.add(newMessage);
 
     if (!isOnline) {
       await db.outbox.add({
         id: newMessageId,
         conversation_id: CONVERSATION_ID,
-        sender_id: currentUserId,
+        sender_id: user.id,
         content: inputText,
         created_at: now,
         retry_count: 0,
       });
     } else {
-      // Kirim langsung ke Supabase Cloud
       const { error } = await supabase.from('messages').insert({
         id: newMessageId,
         conversation_id: CONVERSATION_ID,
-        sender_id: currentUserId,
+        sender_id: user.id,
         content: inputText,
         created_at: now,
       });
@@ -155,7 +183,7 @@ export default function ChatApp() {
         await db.outbox.add({
           id: newMessageId,
           conversation_id: CONVERSATION_ID,
-          sender_id: currentUserId,
+          sender_id: user.id,
           content: inputText,
           created_at: now,
           retry_count: 0,
@@ -168,42 +196,38 @@ export default function ChatApp() {
     setInputText('');
   };
 
-  const currentUserObj = MOCK_USERS.find((u) => u.id === currentUserId) || MOCK_USERS[0];
+  if (loadingAuth) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-slate-900 text-slate-400 text-sm">
+        Memuat sesi akun...
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen max-w-md mx-auto border shadow-2xl bg-slate-50 dark:bg-slate-900 transition-colors">
-      {/* Header */}
+      {/* Header dengan Info Akun Asli */}
       <header className="p-4 bg-white dark:bg-slate-800 border-b dark:border-slate-700 flex justify-between items-center shadow-sm">
         <div>
-          <h1 className="font-bold text-gray-800 dark:text-white text-base">Mini Chat Simulation</h1>
-          <p className="text-[10px] text-slate-400">Multi-User Live Sync</p>
+          <h1 className="font-bold text-gray-800 dark:text-white text-base">WhatsApp-Grade Chat</h1>
+          <p className="text-[10px] text-blue-500 truncate max-w-[160px]">{user?.email}</p>
         </div>
-        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-          isOnline ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400'
-        }`}>
-          {isOnline ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-          <span>{isOnline ? 'Online' : 'Offline'}</span>
+        <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${
+            isOnline ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+          }`}>
+            {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+            <span>{isOnline ? 'Online' : 'Offline'}</span>
+          </div>
+          <button
+            onClick={handleLogout}
+            title="Keluar"
+            className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </header>
-
-      {/* Switcher User */}
-      <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2 border-b dark:border-slate-700 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 font-medium">
-          <Users className="w-3.5 h-3.5 text-blue-500" />
-          <span>Simulasi Sebagai:</span>
-        </div>
-        <select
-          value={currentUserId}
-          onChange={(e) => setCurrentUserId(e.target.value)}
-          className="text-xs font-semibold bg-white dark:bg-slate-900 text-gray-800 dark:text-gray-100 border dark:border-slate-600 rounded-lg px-2.5 py-1 focus:outline-none focus:border-blue-500 shadow-sm"
-        >
-          {MOCK_USERS.map((user) => (
-            <option key={user.id} value={user.id}>
-              {user.name}
-            </option>
-          ))}
-        </select>
-      </div>
 
       {/* Daftar Pesan */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -213,19 +237,11 @@ export default function ChatApp() {
               <MessageSquareCode className="w-8 h-8" />
             </div>
             <p className="font-semibold text-gray-700 dark:text-gray-200">Belum ada percakapan</p>
-            <p className="text-xs mt-1 max-w-[200px]">Kirim pesan untuk mulai simulasi chat dua arah!</p>
+            <p className="text-xs mt-1 max-w-[200px]">Kirim pesan pertama dengan akun asli Anda!</p>
           </div>
         ) : (
           messages?.map((msg) => {
-            const isMe = msg.sender_id === currentUserId;
-            const senderInfo = MOCK_USERS.find((u) => u.id === msg.sender_id);
-            const senderName = senderInfo ? senderInfo.name : 'User Lain';
-            
-            const bubbleStyle = msg.sender_id === '11111111-1111-1111-1111-111111111111' 
-              ? 'bg-blue-600 text-white' 
-              : msg.sender_id === '22222222-2222-2222-2222-222222222222' 
-              ? 'bg-emerald-600 text-white' 
-              : 'bg-purple-600 text-white';
+            const isMe = msg.sender_id === user?.id;
 
             return (
               <div
@@ -235,13 +251,13 @@ export default function ChatApp() {
                 <div
                   className={`max-w-[78%] p-3.5 rounded-2xl text-sm shadow-sm transition-all ${
                     isMe
-                      ? `${bubbleStyle} rounded-br-none`
+                      ? 'bg-blue-600 text-white rounded-br-none'
                       : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 border dark:border-slate-700 rounded-bl-none'
                   }`}
                 >
                   {!isMe && (
                     <p className="text-[10px] font-bold text-blue-500 dark:text-blue-400 mb-1">
-                      {senderName}
+                      {msg.sender_id.substring(0, 6)}...
                     </p>
                   )}
                   <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
@@ -266,7 +282,7 @@ export default function ChatApp() {
         )}
       </div>
 
-      {/* Form Input */}
+      {/* Form Input Pesan */}
       <form
         onSubmit={handleSendMessage}
         className="p-3 bg-white dark:bg-slate-800 border-t dark:border-slate-700 flex gap-2 items-center shadow-lg"
@@ -275,12 +291,12 @@ export default function ChatApp() {
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          placeholder={`Ketik pesan sebagai ${currentUserObj.name}...`}
+          placeholder="Ketik pesan..."
           className="flex-1 px-4 py-2.5 text-sm border dark:border-slate-600 rounded-full focus:outline-none focus:border-blue-500 bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-gray-100 transition"
         />
         <button
           type="submit"
-          className={`p-3 ${currentUserObj.color} text-white rounded-full hover:opacity-90 active:scale-95 transition shadow-md flex items-center justify-center`}
+          className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 active:scale-95 transition shadow-md flex items-center justify-center"
         >
           <Send className="w-4 h-4" />
         </button>
