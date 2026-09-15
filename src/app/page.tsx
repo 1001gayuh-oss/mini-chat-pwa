@@ -26,12 +26,12 @@ export default function ChatApp() {
     []
   );
 
-  // Sinkronisasi & Realtime Listener Dua Arah yang Lebih Tangguh
+  // Sinkronisasi & Realtime Listener Dua Arah yang Sinkron
   useEffect(() => {
     let channel: any;
 
     const initRealtimeSync = async () => {
-      // 1. Tarik data terbaru dari Cloud Supabase saat komponen dimuat
+      // 1. Tarik data historis dari Cloud Supabase saat komponen dimuat
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -54,7 +54,7 @@ export default function ChatApp() {
         }
       }
 
-      // 2. Berlangganan WebSocket Realtime Supabase
+      // 2. Berlangganan WebSocket Realtime Supabase dengan Channel Publik yang Sinkron
       channel = supabase
         .channel('public:messages')
         .on(
@@ -128,7 +128,7 @@ export default function ChatApp() {
       sync_status: isOnline ? 'synced' : 'pending',
     };
 
-    // Simpan ke IndexedDB lokal
+    // Simpan ke IndexedDB lokal terlebih dahulu (Prinsip Local-First)
     await db.messages.add(newMessage);
 
     if (!isOnline) {
@@ -141,7 +141,7 @@ export default function ChatApp() {
         retry_count: 0,
       });
     } else {
-      // Kirim langsung ke Supabase Cloud agar user lain langsung menerima via WebSocket
+      // Kirim langsung ke Supabase Cloud
       const { error } = await supabase.from('messages').insert({
         id: newMessageId,
         conversation_id: CONVERSATION_ID,
@@ -152,7 +152,6 @@ export default function ChatApp() {
 
       if (error) {
         console.error('Gagal mengirim ke cloud:', error.message);
-        // Jika gagal kirim cloud, masukkan ke outbox cadangan
         await db.outbox.add({
           id: newMessageId,
           conversation_id: CONVERSATION_ID,
@@ -222,7 +221,6 @@ export default function ChatApp() {
             const senderInfo = MOCK_USERS.find((u) => u.id === msg.sender_id);
             const senderName = senderInfo ? senderInfo.name : 'User Lain';
             
-            // Tentukan warna gelembung berdasarkan pengirim pesan aslinya
             const bubbleStyle = msg.sender_id === '11111111-1111-1111-1111-111111111111' 
               ? 'bg-blue-600 text-white' 
               : msg.sender_id === '22222222-2222-2222-2222-222222222222' 
