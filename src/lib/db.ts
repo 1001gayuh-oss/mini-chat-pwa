@@ -1,17 +1,15 @@
 import Dexie, { Table } from 'dexie';
 
-export type SyncStatus = 'synced' | 'pending' | 'failed';
-
 export interface LocalMessage {
   id: string;
   conversation_id: string;
   sender_id: string;
   content: string;
   created_at: string;
-  sync_status: SyncStatus;
+  sync_status: 'pending' | 'synced';
 }
 
-export interface LocalOutboxItem {
+export interface OutboxItem {
   id: string;
   conversation_id: string;
   sender_id: string;
@@ -20,17 +18,17 @@ export interface LocalOutboxItem {
   retry_count: number;
 }
 
-class MiniChatOfflineDB extends Dexie {
-  messages!: Table;
-  outbox!: Table;
+export class ChatDatabase extends Dexie {
+  messages!: Table<LocalMessage, string>;
+  outbox!: Table<OutboxItem, string>;
 
   constructor() {
-    super('MiniChatOfflineDB');
+    super('MiniChatLocalDB');
     this.version(1).stores({
-      messages: 'id, conversation_id, sender_id, sync_status, created_at',
+      messages: 'id, conversation_id, created_at, sync_status',
       outbox: 'id, conversation_id, created_at',
     });
   }
 }
 
-export const db = new MiniChatOfflineDB();
+export const db = new ChatDatabase();
