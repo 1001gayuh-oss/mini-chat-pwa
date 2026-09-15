@@ -7,7 +7,6 @@ import { syncOutboxMessages } from '@/lib/syncEngine';
 import { supabase } from '@/lib/supabase';
 import { Wifi, WifiOff, Send, Clock, CheckCheck, Users, MessageSquareCode } from 'lucide-react';
 
-// Daftar Simulasi Pengguna (Multi-User Switcher)
 const MOCK_USERS = [
   { id: '11111111-1111-1111-1111-111111111111', name: 'User A', color: 'bg-blue-600', bubbleColor: 'bg-blue-600 text-white' },
   { id: '22222222-2222-2222-2222-222222222222', name: 'User B', color: 'bg-emerald-600', bubbleColor: 'bg-emerald-600 text-white' },
@@ -21,21 +20,25 @@ export default function ChatApp() {
   const [inputText, setInputText] = useState('');
   const [isOnline, setIsOnline] = useState(true);
 
-  // Mengambil pesan dari penyimpanan lokal IndexedDB secara real-time
+  // Ambil pesan dari IndexedDB secara reaktif
   const messages = useLiveQuery(
     () => db.messages.where({ conversation_id: CONVERSATION_ID }).sortBy('created_at'),
     []
   );
 
-  // Setup Supabase Realtime Listener (Sinkronisasi Dua Arah)
+  // Sinkronisasi & Realtime Listener Dua Arah yang Lebih Tangguh
   useEffect(() => {
-    const fetchCloudMessages = async () => {
-      const { data } = await supabase
+    let channel: any;
+
+    const initRealtimeSync = async () => {
+      // 1. Tarik data terbaru dari Cloud Supabase saat komponen dimuat
+      const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .eq('conversation_id', CONVERSATION_ID);
+        .eq('conversation_id', CONVERSATION_ID)
+        .order('created_at', { ascending: true });
 
-      if (data) {
+      if (!error && data) {
         for (const cloudMsg of data) {
           const exists = await db.messages.get(cloudMsg.id);
           if (!exists) {
@@ -50,40 +53,43 @@ export default function ChatApp() {
           }
         }
       }
+
+      // 2. Berlangganan WebSocket Realtime Supabase
+      channel = supabase
+        .channel('public:messages')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+          },
+          async (payload) => {
+            const newMsg = payload.new as any;
+            if (newMsg && newMsg.conversation_id === CONVERSATION_ID) {
+              const existing = await db.messages.get(newMsg.id);
+              if (!existing) {
+                await db.messages.add({
+                  id: newMsg.id,
+                  conversation_id: newMsg.conversation_id,
+                  sender_id: newMsg.sender_id,
+                  content: newMsg.content,
+                  created_at: newMsg.created_at,
+                  sync_status: 'synced',
+                });
+              }
+            }
+          }
+        )
+        .subscribe();
     };
 
-    fetchCloudMessages();
-
-    // Berlangganan perubahan real-time via WebSocket Supabase
-    const channel = supabase
-      .channel(`room:${CONVERSATION_ID}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${CONVERSATION_ID}`,
-        },
-        async (payload) => {
-          const newMsg = payload.new as any;
-          const existing = await db.messages.get(newMsg.id);
-          if (!existing) {
-            await db.messages.add({
-              id: newMsg.id,
-              conversation_id: newMsg.conversation_id,
-              sender_id: newMsg.sender_id,
-              content: newMsg.content,
-              created_at: newMsg.created_at,
-              sync_status: 'synced',
-            });
-          }
-        }
-      )
-      .subscribe();
+    initRealtimeSync();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, []);
 
@@ -122,6 +128,7 @@ export default function ChatApp() {
       sync_status: isOnline ? 'synced' : 'pending',
     };
 
+    // Simpan ke IndexedDB lokal
     await db.messages.add(newMessage);
 
     if (!isOnline) {
@@ -134,18 +141,39 @@ export default function ChatApp() {
         retry_count: 0,
       });
     } else {
-      syncOutboxMessages();
+      // Kirim langsung ke Supabase Cloud agar user lain langsung menerima via WebSocket
+      const { error } = await supabase.from('messages').insert({
+        id: newMessageId,
+        conversation_id: CONVERSATION_ID,
+        sender_id: currentUserId,
+        content: inputText,
+        created_at: now,
+      });
+
+      if (error) {
+        console.error('Gagal mengirim ke cloud:', error.message);
+        // Jika gagal kirim cloud, masukkan ke outbox cadangan
+        await db.outbox.add({
+          id: newMessageId,
+          conversation_id: CONVERSATION_ID,
+          sender_id: currentUserId,
+          content: inputText,
+          created_at: now,
+          retry_count: 0,
+        });
+      } else {
+        await db.messages.update(newMessageId, { sync_status: 'synced' });
+      }
     }
 
     setInputText('');
   };
 
-  // Helper mendapatkan user aktif saat ini
   const currentUserObj = MOCK_USERS.find((u) => u.id === currentUserId) || MOCK_USERS[0];
 
   return (
     <div className="flex flex-col h-screen max-w-md mx-auto border shadow-2xl bg-slate-50 dark:bg-slate-900 transition-colors">
-      {/* Header Aplikasi */}
+      {/* Header */}
       <header className="p-4 bg-white dark:bg-slate-800 border-b dark:border-slate-700 flex justify-between items-center shadow-sm">
         <div>
           <h1 className="font-bold text-gray-800 dark:text-white text-base">Mini Chat Simulation</h1>
@@ -159,7 +187,7 @@ export default function ChatApp() {
         </div>
       </header>
 
-      {/* PANEL SIMULASI SWITCH USER */}
+      {/* Switcher User */}
       <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2 border-b dark:border-slate-700 flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 font-medium">
           <Users className="w-3.5 h-3.5 text-blue-500" />
@@ -186,14 +214,20 @@ export default function ChatApp() {
               <MessageSquareCode className="w-8 h-8" />
             </div>
             <p className="font-semibold text-gray-700 dark:text-gray-200">Belum ada percakapan</p>
-            <p className="text-xs mt-1 max-w-[200px]">Ubah dropdown simulasi user di atas untuk tes kirim pesan bergantian!</p>
+            <p className="text-xs mt-1 max-w-[200px]">Kirim pesan untuk mulai simulasi chat dua arah!</p>
           </div>
         ) : (
           messages?.map((msg) => {
             const isMe = msg.sender_id === currentUserId;
-            // Cari data pengirim asli berdasarkan sender_id pesan tersebut
             const senderInfo = MOCK_USERS.find((u) => u.id === msg.sender_id);
             const senderName = senderInfo ? senderInfo.name : 'User Lain';
+            
+            // Tentukan warna gelembung berdasarkan pengirim pesan aslinya
+            const bubbleStyle = msg.sender_id === '11111111-1111-1111-1111-111111111111' 
+              ? 'bg-blue-600 text-white' 
+              : msg.sender_id === '22222222-2222-2222-2222-222222222222' 
+              ? 'bg-emerald-600 text-white' 
+              : 'bg-purple-600 text-white';
 
             return (
               <div
@@ -203,11 +237,10 @@ export default function ChatApp() {
                 <div
                   className={`max-w-[78%] p-3.5 rounded-2xl text-sm shadow-sm transition-all ${
                     isMe
-                      ? `${currentUserObj.bubbleColor} rounded-br-none`
+                      ? `${bubbleStyle} rounded-br-none`
                       : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 border dark:border-slate-700 rounded-bl-none'
                   }`}
                 >
-                  {/* Label Nama Pengirim (Hanya tampil di sisi kiri untuk user lain) */}
                   {!isMe && (
                     <p className="text-[10px] font-bold text-blue-500 dark:text-blue-400 mb-1">
                       {senderName}
@@ -235,7 +268,7 @@ export default function ChatApp() {
         )}
       </div>
 
-      {/* Form Input Pesan */}
+      {/* Form Input */}
       <form
         onSubmit={handleSendMessage}
         className="p-3 bg-white dark:bg-slate-800 border-t dark:border-slate-700 flex gap-2 items-center shadow-lg"
