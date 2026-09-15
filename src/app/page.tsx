@@ -9,9 +9,9 @@ import { Wifi, WifiOff, Send, Clock, CheckCheck, Users, MessageSquareCode } from
 
 // Daftar Simulasi Pengguna (Multi-User Switcher)
 const MOCK_USERS = [
-  { id: '11111111-1111-1111-1111-111111111111', name: 'User A (Kamu)', color: 'bg-blue-600' },
-  { id: '22222222-2222-2222-2222-222222222222', name: 'User B', color: 'bg-emerald-600' },
-  { id: '33333333-3333-3333-3333-333333333333', name: 'User C', color: 'bg-purple-600' },
+  { id: '11111111-1111-1111-1111-111111111111', name: 'User A', color: 'bg-blue-600', bubbleColor: 'bg-blue-600 text-white' },
+  { id: '22222222-2222-2222-2222-222222222222', name: 'User B', color: 'bg-emerald-600', bubbleColor: 'bg-emerald-600 text-white' },
+  { id: '33333333-3333-3333-3333-333333333333', name: 'User C', color: 'bg-purple-600', bubbleColor: 'bg-purple-600 text-white' },
 ];
 
 const CONVERSATION_ID = 'room-chat-global-mvp';
@@ -140,7 +140,7 @@ export default function ChatApp() {
     setInputText('');
   };
 
-  // Helper mendapatkan nama dan warna user aktif saat ini
+  // Helper mendapatkan user aktif saat ini
   const currentUserObj = MOCK_USERS.find((u) => u.id === currentUserId) || MOCK_USERS[0];
 
   return (
@@ -159,7 +159,7 @@ export default function ChatApp() {
         </div>
       </header>
 
-      {/* PANEL SIMULASI SWITCH USER (Tanpa Ubah Kode Manual) */}
+      {/* PANEL SIMULASI SWITCH USER */}
       <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2 border-b dark:border-slate-700 flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 font-medium">
           <Users className="w-3.5 h-3.5 text-blue-500" />
@@ -191,7 +191,7 @@ export default function ChatApp() {
         ) : (
           messages?.map((msg) => {
             const isMe = msg.sender_id === currentUserId;
-            // Cari nama pengirim pesan berdasarkan ID-nya
+            // Cari data pengirim asli berdasarkan sender_id pesan tersebut
             const senderInfo = MOCK_USERS.find((u) => u.id === msg.sender_id);
             const senderName = senderInfo ? senderInfo.name : 'User Lain';
 
@@ -203,14 +203,16 @@ export default function ChatApp() {
                 <div
                   className={`max-w-[78%] p-3.5 rounded-2xl text-sm shadow-sm transition-all ${
                     isMe
-                      ? `${currentUserObj.color} text-white rounded-br-none`
+                      ? `${currentUserObj.bubbleColor} rounded-br-none`
                       : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 border dark:border-slate-700 rounded-bl-none'
                   }`}
                 >
-                  {/* Label Nama Pengirim */}
-                  <p className={`text-[10px] font-bold mb-1 ${isMe ? 'text-white/80' : 'text-blue-500 dark:text-blue-400'}`}>
-                    {isMe ? 'Anda' : senderName}
-                  </p>
+                  {/* Label Nama Pengirim (Hanya tampil di sisi kiri untuk user lain) */}
+                  {!isMe && (
+                    <p className="text-[10px] font-bold text-blue-500 dark:text-blue-400 mb-1">
+                      {senderName}
+                    </p>
+                  )}
                   <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                   <div className={`flex items-center justify-end gap-1 mt-1.5 text-[10px] ${isMe ? 'text-white/80' : 'text-slate-400'}`}>
                     <span>
