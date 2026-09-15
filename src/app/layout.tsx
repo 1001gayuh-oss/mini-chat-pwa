@@ -1,11 +1,9 @@
 import type { Metadata } from 'next';
-import './globals.css';
+import './globals.css'; // Sesuaikan dengan path file CSS global Anda
 
 export const metadata: Metadata = {
-  title: 'Mini Chat App',
-  description: 'Chat App Offline First',
-  manifest: '/manifest.json',
-  themeColor: '#2563eb',
+  title: 'Mini App Chat MVP',
+  description: 'Chat app with offline support',
 };
 
 export default function RootLayout({
@@ -14,8 +12,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    
-      {children}
-    
+    <html lang="id">
+      <body>{children}</body>
+    </html>
   );
 }
