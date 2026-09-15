@@ -209,7 +209,7 @@ export default function ChatApp() {
       {/* Header dengan Info Akun Asli */}
       <header className="p-4 bg-white dark:bg-slate-800 border-b dark:border-slate-700 flex justify-between items-center shadow-sm">
         <div>
-          <h1 className="font-bold text-gray-800 dark:text-white text-base">WhatsApp-Grade Chat</h1>
+          <h1 className="font-bold text-gray-800 dark:text-white text-base">CiChat</h1>
           <p className="text-[10px] text-blue-500 truncate max-w-[160px]">{user?.email}</p>
         </div>
         <div className="flex items-center gap-2">
