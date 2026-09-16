@@ -1,13 +1,11 @@
 'use client';
 
-export const dynamic = 'force-dynamic'; // <-- Tambahan baris ini agar lolos build Vercel
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Camera, Users, Link as LinkIcon, Shield, Bell, CheckCircle2, X } from 'lucide-react';
+import { ArrowLeft, Camera, Users, Shield, CheckCircle2, X } from 'lucide-react';
 
-export default function CreateGroupPage() {
+function CreateGroupContent() {
   const [user, setUser] = useState<any>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -31,14 +29,14 @@ export default function CreateGroupPage() {
       else {
         setUser(session.user);
         if (type === 'sub') {
-          fetchMainGroups(session.user.id);
+          fetchMainGroups();
         }
       }
     };
     checkSession();
   }, [router, type]);
 
-  const fetchMainGroups = async (userId: string) => {
+  const fetchMainGroups = async () => {
     const { data } = await supabase.from('groups').select('*').is('parent_group_id', null);
     if (data) setMainGroups(data);
   };
@@ -88,7 +86,6 @@ export default function CreateGroupPage() {
       </header>
 
       <form onSubmit={handleCreateGroup} className="p-4 space-y-4 flex-1 overflow-y-auto pb-16">
-        
         {type === 'sub' && (
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Pilih Grup Pusat (Induk)</label>
@@ -201,5 +198,13 @@ export default function CreateGroupPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CreateGroupPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen bg-slate-50 text-xs text-slate-400">Memuat halaman...</div>}>
+      <CreateGroupContent />
+    </Suspense>
   );
 }
