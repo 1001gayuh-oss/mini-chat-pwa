@@ -37,8 +37,7 @@ export default function SelectContactPage() {
   };
 
   const startChatWithContact = async (contactUserId: string) => {
-    // Buat atau cari conversation privat antar 2 user
-    const { data: newConv, error } = await supabase
+    const { data: newConv } = await supabase
       .from('conversations')
       .insert({})
       .select()
@@ -76,7 +75,7 @@ export default function SelectContactPage() {
         </div>
       </header>
 
-      {/* Aksi Cepat: Grup Baru & Kontak Baru */}
+      {/* Aksi Cepat: Grup Baru diarahkan ke /groups & Kontak Baru */}
       <div className="p-3 bg-white dark:bg-slate-800 border-b dark:border-slate-700 space-y-2">
         <div className="relative flex items-center mb-2">
           <Search className="w-4 h-4 absolute left-3 text-slate-400" />
@@ -89,8 +88,9 @@ export default function SelectContactPage() {
           />
         </div>
 
+        {/* Tombol Grup Baru diarahkan ke /groups */}
         <button 
-          onClick={() => router.push('/groups/create')} 
+          onClick={() => router.push('/groups')} 
           className="w-full flex items-center gap-3 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-xl transition text-xs font-semibold text-blue-600 dark:text-blue-400"
         >
           <div className="w-9 h-9 bg-blue-100 dark:bg-blue-950 rounded-full flex items-center justify-center">
