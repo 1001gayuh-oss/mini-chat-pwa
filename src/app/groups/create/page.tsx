@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic'; // <-- Tambahan baris ini agar lolos build Vercel
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -62,7 +64,6 @@ export default function CreateGroupPage() {
     if (error) {
       setModal({ show: true, title: 'Gagal', message: error.message });
     } else {
-      // Masukkan pembuat sebagai admin grup
       await supabase.from('group_members').insert({
         group_id: newGroup.id,
         user_id: user.id,
@@ -88,7 +89,6 @@ export default function CreateGroupPage() {
 
       <form onSubmit={handleCreateGroup} className="p-4 space-y-4 flex-1 overflow-y-auto pb-16">
         
-        {/* Pilihan Grup Pusat jika tipe sub */}
         {type === 'sub' && (
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Pilih Grup Pusat (Induk)</label>
@@ -106,7 +106,6 @@ export default function CreateGroupPage() {
           </div>
         )}
 
-        {/* Foto / Icon Grup */}
         <div className="flex flex-col items-center">
           <div className="relative">
             <div className="w-20 h-20 bg-purple-600 text-white rounded-full flex items-center justify-center shadow-inner">
@@ -142,7 +141,6 @@ export default function CreateGroupPage() {
           />
         </div>
 
-        {/* Setting Role Admin & Anggota */}
         <div className="bg-white dark:bg-slate-800 p-3.5 rounded-xl border dark:border-slate-700 space-y-3">
           <h3 className="font-bold text-xs text-gray-800 dark:text-white flex items-center gap-1.5">
             <Shield className="w-4 h-4 text-blue-500" />
@@ -165,7 +163,6 @@ export default function CreateGroupPage() {
           </div>
         </div>
 
-        {/* Link Tautan Grup */}
         <div>
           <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Link Tautan Undangan Grup</label>
           <div className="flex items-center gap-2">
