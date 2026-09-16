@@ -3,70 +3,93 @@
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { MessageSquareCode, Lock, Mail, ArrowRight, Eye, EyeOff, User, CheckCircle2, X } from 'lucide-react';
+import { MessageSquareCode, Lock, Mail, ArrowRight, Eye, EyeOff, User, CheckCircle2, X, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const [username, setUsername] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
   
-  const [modalInfo, setModalInfo] = useState<{ show: boolean; title: string; message: string }>({
+  // State Popup Kustom
+  const [modalInfo, setModalInfo] = useState<{ show: boolean; title: string; message: string; isError?: boolean }>({
     show: false,
     title: '',
     message: '',
+    isError: false,
   });
 
   const router = useRouter();
 
+  // Fungsi Cek Ketersediaan Username (Hanya Huruf & Angka, Unique Check)
+  const handleCheckUsername = async () => {
+    if (!username.trim()) {
+      setModalInfo({ show: true, title: 'Perhatian', message: 'Silakan isi username terlebih dahulu.', isError: true });
+      return;
+    }
+
+    // Validasi regex: hanya huruf dan angka
+    const regex = /^[a-zA-Z0-9]+$/;
+    if (!regex.test(username)) {
+      setModalInfo({ show: true, title: 'Format Salah', message: 'User ID hanya boleh menggunakan huruf dan angka tanpa spasi atau simbol!', isError: true });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('username', username)
+      .single();
+
+    if (data) {
+      setModalInfo({ show: true, title: 'Tidak Tersedia', message: `Username "${username}" sudah digunakan pengguna lain. Pilih nama lain.`, isError: true });
+    } else {
+      setModalInfo({ show: true, title: 'Tersedia!', message: `Username "${username}" dapat digunakan.`, isError: false });
+    }
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setErrorMessage('');
 
     if (isSignUp) {
-      // Proses Registrasi Akun Baru dengan menyertakan Display Name di metadata
+      const regex = /^[a-zA-Z0-9]+$/;
+      if (!regex.test(username)) {
+        setModalInfo({ show: true, title: 'Format Salah', message: 'User ID hanya boleh menggunakan huruf dan angka.', isError: true });
+        setLoading(false);
+        return;
+      }
+
+      // 1. Sign Up Auth
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            display_name: displayName || email.split('@')[0],
-          },
-        },
+        options: { data: { username } }
       });
 
       if (error) {
-        setErrorMessage(error.message);
+        setModalInfo({ show: true, title: 'Gagal Daftar', message: error.message, isError: true });
       } else {
-        // Jika berhasil, masukkan juga data manual ke tabel profiles jika tabelnya aktif
         if (data.user) {
           await supabase.from('profiles').upsert({
             id: data.user.id,
-            email: email,
-            display_name: displayName || email.split('@')[0],
+            username: username,
           });
         }
-
         setModalInfo({
           show: true,
           title: 'Registrasi Berhasil!',
-          message: 'Akun Anda berhasil dibuat. Silakan masuk atau periksa email jika verifikasi diaktifkan.',
+          message: 'Akun Anda berhasil dibuat. Silakan masuk.',
+          isError: false,
         });
         setIsSignUp(false);
       }
     } else {
-      // Proses Masuk (Login)
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        setErrorMessage(error.message);
+        setModalInfo({ show: true, title: 'Gagal Masuk', message: error.message, isError: true });
       } else {
         router.push('/');
         router.refresh();
@@ -90,27 +113,27 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {errorMessage && (
-          <div className="mb-4 p-3 bg-rose-50 text-rose-600 text-xs rounded-lg border border-rose-200">
-            {errorMessage}
-          </div>
-        )}
-
         <form onSubmit={handleAuth} className="space-y-4">
-          {/* Input Nama / User ID (Hanya tampil saat mode Sign Up) */}
           {isSignUp && (
             <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Nama / User ID</label>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">User ID / Username (Huruf & Angka)</label>
               <div className="relative flex items-center">
                 <User className="w-4 h-4 absolute left-3 text-slate-400" />
                 <input
                   type="text"
                   required
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Contoh: Budi Santoso"
-                  className="w-full pl-10 pr-4 py-2.5 text-sm border dark:border-slate-600 rounded-xl focus:outline-none focus:border-blue-500 bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-gray-100"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="contoh: budisantoso123"
+                  className="w-full pl-10 pr-16 py-2.5 text-sm border dark:border-slate-600 rounded-xl focus:outline-none focus:border-blue-500 bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-gray-100"
                 />
+                <button
+                  type="button"
+                  onClick={handleCheckUsername}
+                  className="absolute right-2 px-2.5 py-1 bg-slate-200 dark:bg-slate-700 hover:bg-blue-600 hover:text-white text-gray-700 dark:text-gray-200 text-[10px] font-bold rounded-lg transition"
+                >
+                  Cek
+                </button>
               </div>
             </div>
           )}
@@ -142,12 +165,10 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 className="w-full pl-10 pr-10 py-2.5 text-sm border dark:border-slate-600 rounded-xl focus:outline-none focus:border-blue-500 bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-gray-100"
               />
-              {/* Tombol Ikon Mata untuk Lihat Password */}
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
-                title={showPassword ? 'Sembunyikan password' : 'Lihat password'}
+                className="absolute right-3 text-slate-400 hover:text-slate-600 transition"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -174,26 +195,26 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Modal Popup Kustom */}
+      {/* --- POPUP MODAL KUSTOM SERAGAM --- */}
       {modalInfo.show && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="bg-white dark:bg-slate-800 w-full max-w-xs rounded-2xl shadow-2xl border dark:border-slate-700 p-6 flex flex-col items-center text-center relative">
             <button
               onClick={() => setModalInfo({ ...modalInfo, show: false })}
-              className="absolute top-3 right-3 text-slate-400 hover:text-slate-600"
+              className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 transition"
             >
               <X className="w-4 h-4" />
             </button>
-            <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-3 shadow-inner">
-              <CheckCircle2 className="w-6 h-6" />
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 shadow-inner ${modalInfo.isError ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>
+              {modalInfo.isError ? <AlertCircle className="w-6 h-6" /> : <CheckCircle2 className="w-6 h-6" />}
             </div>
             <h3 className="text-base font-bold text-gray-800 dark:text-white mb-1">{modalInfo.title}</h3>
             <p className="text-xs text-slate-500 dark:text-slate-300 leading-relaxed mb-5">{modalInfo.message}</p>
             <button
               onClick={() => setModalInfo({ ...modalInfo, show: false })}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition shadow-md"
+              className={`w-full py-2.5 text-white rounded-xl text-xs font-semibold transition shadow-md ${modalInfo.isError ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
             >
-              Mengerti & Masuk
+              Mengerti
             </button>
           </div>
         </div>
